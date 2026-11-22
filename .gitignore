@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+~$*.xlsx
+
+/grafik/
+/*.zip
+/WI1102 Kelompok 07_Progress 02 Tugas Besar.py.py
