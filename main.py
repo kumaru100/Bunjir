@@ -1,21 +1,13 @@
 # Sistem Monitoring Risiko Banjir Bandung Timur | Kelompok 7
-from argparse import ArgumentParser
 from calendar import monthrange
 from contextlib import closing
 from datetime import datetime, timedelta
 from math import isclose, isfinite, sqrt
 from pathlib import Path
-from zipfile import BadZipFile
-import sys
 
 BULAN = ("Januari", "Februari", "Maret", "April", "Mei", "Juni",
          "Juli", "Agustus", "September", "Oktober", "November", "Desember")
-# Puncak per jam setiap bulan di workbook NASA, juga tersedia untuk mode data contoh.
-HUJAN_CONTOH = {
-    2024: (5.85, 10.46, 5.03, 6.61, 5.35, 5.27, 15.05, 4.90, 16.58, 1.22, 4.72, 3.52),
-    2025: (9.44, 7.52, 8.05, 4.78, 5.83, 5.47, 4.73, 5.06, 6.11, 3.43, 2.91, 2.95),
-    2026: (6.09, 4.57, 5.30, 4.11, 3.46, 1.13),
-}
+JUMLAH_BULAN = {2024: 12, 2025: 12, 2026: 6}
 SATU_JAM = timedelta(hours=1)
 Hujan = "Hujan (mm/jam)"
 Luas = "Luas Tangkapan (ha)"
@@ -23,7 +15,6 @@ C = "Koefisien Limpasan C"
 Lebar, Dalam = "Lebar (m)", "Kedalaman Efektif (m)"
 Kemiringan, Manning = "Kemiringan (%)", "Manning n"
 Lokasi, Jenis = "Lokasi/Ruas", "Jenis Data"
-DIMENSI = {1: (0.30, 0.30), 2: (0.30, 0.40), 3: (0.50, 0.50)}
 KAPASITAS_TERLAMPAUI = "KAPASITAS TERLAMPAUI"
 
 
@@ -135,10 +126,10 @@ def baca_hujan(sheet, tahun, bulan):
 
 
 # Menggabungkan jam berturut-turut saat limpasan melebihi kapasitas.
-def cari_jam_rawan(saluran, seri, faktor):
+def cari_jam_rawan(saluran, seri):
     periode = []
     for waktu, hujan in seri:
-        _, limpasan, kapasitas = hitung_debit(saluran, hujan * faktor)
+        _, limpasan, kapasitas = hitung_debit(saluran, hujan)
         if status_debit(limpasan, kapasitas) != KAPASITAS_TERLAMPAUI:
             continue
         lebih = limpasan - kapasitas
@@ -164,19 +155,6 @@ def minta_angka(pesan, konversi, valid):
         print("Masukkan angka dalam rentang yang diminta.")
 
 
-# Membuat skenario enam kecamatan dengan luas yang diisi pengguna.
-def data_contoh(tahun, bulan):
-    hujan = HUJAN_CONTOH[tahun][bulan - 1]
-    wilayah = ("Gedebage", "Rancasari", "Cinambo", "Panyileukan", "Cibiru", "Ujungberung")
-    for nama, level in zip(wilayah, (1, 3, 1, 2, 3, 2)):
-        luas = minta_angka(f"Luas tangkapan {nama} (>0 ha): ", float,
-                          lambda nilai: isfinite(nilai) and nilai > 0)
-        lebar, kedalaman = DIMENSI[level]
-        yield {"Kecamatan": nama, Lokasi: f"Skenario level {level}", Jenis: "REFERENSI",
-               Hujan: hujan, Luas: luas, C: 0.50, Lebar: lebar, Dalam: kedalaman,
-               Kemiringan: 0.50, Manning: 0.013, "Keterangan": "Ukuran acuan DAS Cinambo."}
-
-
 # Mencetak judul dan isi tabel dengan kolom yang rata.
 def tabel(header, isi):
     baris = [header, *isi]
@@ -188,7 +166,7 @@ def tabel(header, isi):
 
 
 # Menampilkan ringkasan, detail jam rawan, dan menyiapkan data grafik.
-def tampilkan(data, seri, tahun, bulan, faktor):
+def tampilkan(data, seri, tahun, bulan):
     puncak_hujan = None
     if seri is not None:
         jumlah_jam = monthrange(tahun, bulan)[1] * 24
@@ -202,7 +180,7 @@ def tampilkan(data, seri, tahun, bulan, faktor):
     for nomor, saluran in enumerate(data, 1):
         nama = saluran["Kecamatan"]
         label = f"{nomor}. {nama}" if nama_daerah.count(nama) > 1 else nama
-        hujan = (saluran[Hujan] if seri is None else puncak_hujan) * faktor
+        hujan = saluran[Hujan] if seri is None else puncak_hujan
         v, q, kapasitas = hitung_debit(saluran, hujan)
         grafik.append((label, q, kapasitas))
         row = [str(nomor), nama, saluran[Jenis], f"{hujan:.2f}", f"{q:.2f}",
@@ -211,7 +189,7 @@ def tampilkan(data, seri, tahun, bulan, faktor):
         parameter.append([str(nomor), saluran[Lokasi] or "-", f"{saluran[Luas]:g}", f"{saluran[C]:g}",
                           f"{saluran[Lebar]:g} × {saluran[Dalam]:g}", f"{v:.2f}"])
         if seri is not None:
-            periode = cari_jam_rawan(saluran, seri, faktor)
+            periode = cari_jam_rawan(saluran, seri)
             row.append(str(sum((akhir - awal) // SATU_JAM for awal, akhir, _ in periode)))
             for mulai, selesai, puncak in periode:
                 detail.append([str(nomor), nama, f"{mulai:%d/%m %H:%M}", f"{selesai:%d/%m %H:%M}",
@@ -238,7 +216,7 @@ def tampilkan(data, seri, tahun, bulan, faktor):
 
 
 # Menyimpan grafik perbandingan limpasan dan kapasitas sebagai PNG.
-def simpan_grafik(data, tahun, bulan, pilihan, perubahan):
+def simpan_grafik(data, tahun, bulan, pilihan):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -253,16 +231,13 @@ def simpan_grafik(data, tahun, bulan, pilihan, perubahan):
     ax.invert_yaxis()
     ax.set_xlabel("Debit (L/detik)")
     judul = f"{BULAN[bulan - 1]} {tahun}"
-    if perubahan:
-        judul += f" | Hujan {perubahan:+g}%"
     ax.set_title(f"Perbandingan debit antar kecamatan\n{judul} · Simulasi", loc="left")
     ax.set_axisbelow(True)
     ax.grid(axis="x", alpha=0.24)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.14), ncols=2, frameon=False)
     folder = Path.cwd() / "grafik"
     folder.mkdir(exist_ok=True)
-    skenario = f"_hujan{perubahan:+g}persen" if perubahan else ""
-    file = folder / f"debit_{tahun}-{bulan:02d}_menu{pilihan}{skenario}.png"
+    file = folder / f"debit_{tahun}-{bulan:02d}_menu{pilihan}.png"
     fig.savefig(file, dpi=160)
     plt.close(fig)
     print(f"Grafik: {file}")
@@ -278,41 +253,27 @@ def impor_excel(pilihan, tahun, bulan):
         raise ValueError("Gunakan file Excel .xlsx.")
     with closing(load_workbook(path, read_only=True, data_only=True)) as wb:
         sheet = wb["Data"] if "Data" in wb.sheetnames else wb.active
-        data = list(baca_kecamatan(sheet, tahun, BULAN[bulan - 1], bulanan=pilihan == 2))
-        if pilihan == 3 and "NASA per Jam" not in wb.sheetnames:
+        data = list(baca_kecamatan(sheet, tahun, BULAN[bulan - 1], bulanan=pilihan == 1))
+        if pilihan == 2 and "NASA per Jam" not in wb.sheetnames:
             raise ValueError("Jam Rawan memerlukan sheet 'NASA per Jam'.")
-        seri = baca_hujan(wb["NASA per Jam"], tahun, bulan) if pilihan == 3 else None
+        seri = baca_hujan(wb["NASA per Jam"], tahun, bulan) if pilihan == 2 else None
     return data, seri
 
 
 # Menjalankan pilihan tahun, bulan, dan menu analisis.
 def main():
-    parser = ArgumentParser(description="Simulasi kapasitas drainase Bandung Timur.")
-    parser.add_argument("--perubahan-hujan", type=float, default=0, metavar="PERSEN")
-    perubahan = parser.parse_args().perubahan_hujan
-    if not isfinite(perubahan) or perubahan < -100:
-        parser.error("--perubahan-hujan harus angka hingga dengan nilai minimum -100.")
     print("=== MONITORING RISIKO BANJIR BANDUNG TIMUR ===")
-    tahun = minta_angka("Pilih tahun (2024/2025/2026): ", int, lambda nilai: nilai in HUJAN_CONTOH)
-    jumlah_bulan = len(HUJAN_CONTOH[tahun])
+    tahun = minta_angka("Pilih tahun (2024/2025/2026): ", int, lambda nilai: nilai in JUMLAH_BULAN)
+    jumlah_bulan = JUMLAH_BULAN[tahun]
     for i, nama in enumerate(BULAN[:jumlah_bulan], 1):
         print(f"{i}. {nama}")
     bulan = minta_angka(f"Pilih bulan (1–{jumlah_bulan}): ", int, lambda nilai: 1 <= nilai <= jumlah_bulan)
-    print("1. Data contoh\n2. Analisis Excel\n3. Analisis jam rawan")
-    pilihan = minta_angka("Pilih data (1–3): ", int, lambda nilai: 1 <= nilai <= 3)
+    print("1. Analisis Bulanan\n2. Analisis Harian untuk Jam Rawan")
+    pilihan = minta_angka("Pilih analisis (1–2): ", int, lambda nilai: 1 <= nilai <= 2)
     print(f"\nBulan: {BULAN[bulan - 1]} {tahun}")
-    if perubahan:
-        print(f"Skenario perubahan intensitas hujan: {perubahan:+g}%.")
-    try:
-        data, seri = (list(data_contoh(tahun, bulan)), None) if pilihan == 1 else impor_excel(pilihan, tahun, bulan)
-        grafik = tampilkan(data, seri, tahun, bulan, 1 + perubahan / 100)
-        simpan_grafik(grafik, tahun, bulan, pilihan, perubahan)
-    except ImportError:
-        perintah = f'"{sys.executable}" -m pip install -r requirements.txt'
-        awalan = "& " if sys.platform == "win32" else ""
-        raise SystemExit(f"Dependensi belum terpasang. Jalankan {awalan}{perintah}") from None
-    except (OSError, ValueError, BadZipFile) as error:
-        raise SystemExit(f"Analisis gagal: {error}") from None
+    data, seri = impor_excel(pilihan, tahun, bulan)
+    grafik = tampilkan(data, seri, tahun, bulan)
+    simpan_grafik(grafik, tahun, bulan, pilihan)
 
 
 if __name__ == "__main__":
