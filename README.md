@@ -1,6 +1,6 @@
 # Bunjir
 
-Simulasi kapasitas drainase untuk enam kecamatan di Bandung Timur. Bunjir adalah proyek Berpikir Komputasional Kelompok 7. Namanya terinspirasi dari milk bun.
+Simulasi kapasitas drainase untuk enam kecamatan di Bandung Timur, dengan pilihan simulasi manual untuk daerah dan curah hujan yang diisi pengguna. Bunjir adalah proyek Berpikir Komputasional Kelompok 7. Namanya terinspirasi dari milk bun.
 
 Bunjir membaca **21.888 jam data hujan NASA POWER**, menghitung debit limpasan dan kapasitas saluran, lalu menampilkan hasil dalam tabel terminal dan grafik PNG. Mode **Jam Rawan** menggabungkan jam berturut-turut saat limpasan melampaui kapasitas. Hasilnya menggambarkan potensi kelebihan kapasitas pada ruas atau skenario yang dianalisis.
 
@@ -15,16 +15,18 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-Jika editor memakai Python 3.13 pada Windows, gunakan `python3.13` untuk kedua perintah. Pilih **tahun → bulan → analisis**. Tahun 2024 dan 2025 tersedia Januari–Desember, sedangkan 2026 tersedia Januari–Juni. Tekan Enter di prompt path untuk memakai Excel yang disertakan.
+Jika editor memakai Python 3.13 pada Windows, gunakan `python3.13` untuk kedua perintah. Pilih dulu **Analisis data Bandung** atau **Bikin simulasi manual**. Analisis data memakai tahun 2024–2026 dari Excel; simulasi manual menerima tahun, bulan, dan daerah yang ingin dimasukkan.
 
-Untuk melihat hasil Jam Rawan, pilih **2024 → 9 → 2 → Enter**. Panyileukan menghasilkan 6 jam potensi kelebihan kapasitas dan grafiknya tersimpan di `grafik/debit_2024-09_menu2.png`.
+Untuk analisis Bandung, pilih **1 → 2024 → 9 → 2 → Enter** untuk melihat hasil Jam Rawan. Panyileukan menghasilkan 6 jam potensi kelebihan kapasitas dan grafiknya tersimpan di `grafik/debit_2024-09_menu2.png`.
 
-| Menu | Masukan | Hasil |
+| Mode | Masukan | Hasil |
 |---|---|---|
-| 1. Analisis Bulanan | Pilih bulan dan file. Workbook bawaan memakai maksimum satu jam per bulan untuk keenam lokasi. | Debit, kapasitas, kelebihan debit, persentase pemakaian, status, dan cakupan data tiap lokasi. |
-| 2. Analisis Jam Rawan | Pilih bulan dan file yang memiliki sheet `NASA per Jam`. | Waktu mulai, waktu selesai, durasi, dan puncak kelebihan debit setiap periode per lokasi. |
+| 1. Analisis data Bandung | Pilih tahun dan bulan, lalu pilih analisis bulanan atau Jam Rawan. Tekan Enter di prompt path untuk memakai Excel yang disertakan. | Hasil analisis enam kecamatan Bandung Timur. |
+| 2. Bikin simulasi manual | Pilih tahun, bulan, dan jumlah daerah. Program meminta nama, luas tangkapan, hujan, serta parameter saluran untuk setiap daerah. | Hasil per daerah dan grafik perbandingan yang sama seperti analisis Excel. |
 
-Keluaran terminal berbentuk tabel. Kedua menu juga menyimpan grafik PNG debit limpasan puncak dan kapasitas saluran tiap kecamatan ke folder `grafik/` di direktori tempat perintah dijalankan. Nama file memuat tahun, bulan, dan menu.
+Di mode analisis data Bandung, analisis bulanan memakai maksimum satu jam per bulan untuk keenam lokasi. Analisis Jam Rawan memerlukan sheet `NASA per Jam`. Keluaran terminal berbentuk tabel dan tiap mode menyimpan grafik PNG debit limpasan puncak serta kapasitas saluran ke folder `grafik/`. Grafik simulasi manual memuat semua daerah yang dimasukkan.
+
+Untuk setiap daerah dalam simulasi manual, masukkan luas tangkapan (ha), intensitas hujan untuk bulan terpilih (mm/jam), koefisien limpasan C, lebar dan kedalaman saluran (m), kemiringan (%), serta Manning n. Nilai tersebut dipakai langsung untuk simulasi dan diberi label `ASUMSI`.
 
 ## Struktur Excel
 

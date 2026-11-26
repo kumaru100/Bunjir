@@ -237,7 +237,8 @@ def simpan_grafik(data, tahun, bulan, pilihan):
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.14), ncols=2, frameon=False)
     folder = Path.cwd() / "grafik"
     folder.mkdir(exist_ok=True)
-    file = folder / f"debit_{tahun}-{bulan:02d}_menu{pilihan}.png"
+    nama_menu = f"menu{pilihan}" if isinstance(pilihan, int) else pilihan
+    file = folder / f"debit_{tahun}-{bulan:02d}_{nama_menu}.png"
     fig.savefig(file, dpi=160)
     plt.close(fig)
     print(f"Grafik: {file}")
@@ -263,17 +264,52 @@ def impor_excel(pilihan, tahun, bulan):
 # Menjalankan pilihan tahun, bulan, dan menu analisis.
 def main():
     print("=== MONITORING RISIKO BANJIR BANDUNG TIMUR ===")
-    tahun = minta_angka("Pilih tahun (2024/2025/2026): ", int, lambda nilai: nilai in JUMLAH_BULAN)
-    jumlah_bulan = JUMLAH_BULAN[tahun]
-    for i, nama in enumerate(BULAN[:jumlah_bulan], 1):
-        print(f"{i}. {nama}")
-    bulan = minta_angka(f"Pilih bulan (1–{jumlah_bulan}): ", int, lambda nilai: 1 <= nilai <= jumlah_bulan)
-    print("1. Analisis Bulanan\n2. Analisis Harian untuk Jam Rawan")
-    pilihan = minta_angka("Pilih analisis (1–2): ", int, lambda nilai: 1 <= nilai <= 2)
+    print("1. Analisis data Bandung\n2. Bikin simulasi manual")
+    mode = minta_angka("Pilih mode (1–2): ", int, lambda nilai: 1 <= nilai <= 2)
+    if mode == 1:
+        tahun = minta_angka("Pilih tahun (2024/2025/2026): ", int,
+                            lambda nilai: nilai in JUMLAH_BULAN)
+        jumlah_bulan = JUMLAH_BULAN[tahun]
+        for i, nama in enumerate(BULAN[:jumlah_bulan], 1):
+            print(f"{i}. {nama}")
+        bulan = minta_angka(f"Pilih bulan (1–{jumlah_bulan}): ", int,
+                            lambda nilai: 1 <= nilai <= jumlah_bulan)
+        print("1. Analisis Bulanan\n2. Analisis Harian untuk Jam Rawan")
+        pilihan = minta_angka("Pilih analisis (1–2): ", int, lambda nilai: 1 <= nilai <= 2)
+        data, seri = impor_excel(pilihan, tahun, bulan)
+        nama_grafik = pilihan
+    else:
+        tahun = minta_angka("Tahun simulasi: ", int, lambda nilai: nilai > 0)
+        bulan = minta_angka("Bulan simulasi (1–12): ", int, lambda nilai: 1 <= nilai <= 12)
+        jumlah_daerah = minta_angka("Jumlah daerah: ", int, lambda nilai: nilai > 0)
+        data, seri = [], None
+        for nomor in range(1, jumlah_daerah + 1):
+            print(f"\nDaerah {nomor} dari {jumlah_daerah}")
+            nama = input("Nama daerah: ").strip() or f"Daerah {nomor}"
+            data.append({
+                "Kecamatan": nama,
+                Lokasi: "Input manual",
+                Jenis: "ASUMSI",
+                Luas: minta_angka("Luas tangkapan (ha): ", float,
+                                  lambda nilai: isfinite(nilai) and nilai > 0),
+                Hujan: minta_angka(f"Intensitas hujan {BULAN[bulan - 1]} (mm/jam): ", float,
+                                   lambda nilai: isfinite(nilai) and nilai >= 0),
+                C: minta_angka("Koefisien limpasan C (0–1): ", float,
+                              lambda nilai: isfinite(nilai) and 0 <= nilai <= 1),
+                Lebar: minta_angka("Lebar saluran (m): ", float,
+                                   lambda nilai: isfinite(nilai) and nilai > 0),
+                Dalam: minta_angka("Kedalaman saluran (m): ", float,
+                                   lambda nilai: isfinite(nilai) and nilai > 0),
+                Kemiringan: minta_angka("Kemiringan saluran (%): ", float,
+                                        lambda nilai: isfinite(nilai) and nilai > 0),
+                Manning: minta_angka("Manning n: ", float,
+                                    lambda nilai: isfinite(nilai) and nilai > 0),
+                "Keterangan": "Parameter simulasi diisi manual oleh pengguna.",
+            })
+        nama_grafik = "simulasi"
     print(f"\nBulan: {BULAN[bulan - 1]} {tahun}")
-    data, seri = impor_excel(pilihan, tahun, bulan)
     grafik = tampilkan(data, seri, tahun, bulan)
-    simpan_grafik(grafik, tahun, bulan, pilihan)
+    simpan_grafik(grafik, tahun, bulan, nama_grafik)
 
 
 if __name__ == "__main__":
